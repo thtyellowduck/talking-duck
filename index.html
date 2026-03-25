@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talking Duck 🦆</title>
+    <meta name="description" content="Paste text. Learn languages. Simple.">
+    <meta name="theme-color" content="#0071e3">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Talking Duck">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🦆 Talking Duck</h1>
+            <span class="version-number">v...</span>
+            <p class="subtitle">Paste text. Learn languages. Simple.</p>
+            <div class="header-buttons">
+                <button class="header-btn" id="themeToggle" title="Toggle dark/light mode">🌙</button>
+                <button class="header-btn" id="historyBtn" title="Translation history">🕐</button>
+                <button class="header-btn" id="roadmapBtn" title="Project roadmap">📋</button>
+                <div class="header-btn-wrapper">
+                    <button class="header-btn" id="fluentBtn" title="Pick your fluent language">💬</button>
+                    <div class="fluent-dropdown" id="fluentDropdown">
+                        <div class="dropdown-title">I'm fluent in:</div>
+                        <div class="dropdown-options" id="fluentOptions">
+                            <button class="style-option active" data-value="en">English</button>
+                            <button class="style-option" data-value="fr">French</button>
+                            <button class="style-option" data-value="ja">Japanese</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="language-selector">
+            <div class="lang-option">
+                <label>I speak:</label>
+                <div class="lang-display" id="fromLangDisplay">English</div>
+            </div>
+            <div class="lang-option">
+                <label>I'm learning:</label>
+                <select id="toLang">
+                    <option value="fr">French</option>
+                    <option value="ja">Japanese</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <textarea
+                id="inputText"
+                placeholder="Paste your text here... song lyrics, stories, articles, anything!"
+                rows="4"
+                maxlength="1000"
+            ></textarea>
+            <div class="char-counter" id="charCounter">0 / 1000</div>
+            <button class="translate-btn" id="translateBtn">Translate 🦆</button>
+        </div>
+
+        <div class="results-container" id="resultsContainer">
+
+            <!-- LEFT PANEL: Translating -->
+            <div class="results-panel translating-panel">
+                <div class="panel-header">
+                    <div class="panel-titles">
+                        <h3 class="panel-fixed-title">Translating</h3>
+                        <p class="panel-lang-name" id="translatingLangName">English</p>
+                    </div>
+                    <div class="panel-header-actions">
+                        <button class="copy-btn" id="copyTranslatingBtn" title="Copy text">Copy</button>
+                        <div class="panel-settings-wrapper">
+                            <button class="panel-settings-btn" id="translatingSettingsBtn" title="Display settings">🇬🇧</button>
+                            <div class="panel-settings-dropdown" id="translatingSettingsDropdown">
+                                <div class="dropdown-title" id="translatingDropdownTitle">English Display Settings</div>
+                                <div id="translatingJpSettings" style="display: none;">
+                                    <div class="dropdown-section">
+                                        <label class="dropdown-label">Main Display Style</label>
+                                        <div class="dropdown-options" id="translatingMainStyle">
+                                            <button class="style-option active" data-value="kanji">Kanji + Hiragana</button>
+                                            <button class="style-option" data-value="hiragana">Hiragana only</button>
+                                            <button class="style-option" data-value="romaji">Romaji only</button>
+                                        </div>
+                                    </div>
+                                    <div class="dropdown-section">
+                                        <label class="dropdown-label">Secondary Display</label>
+                                        <div class="dropdown-options" id="translatingSecondaryMode">
+                                            <button class="style-option active" data-value="off">Off</button>
+                                            <button class="style-option" data-value="always">Always on</button>
+                                            <button class="style-option" data-value="click">On click only</button>
+                                        </div>
+                                    </div>
+                                    <div class="dropdown-section" id="translatingSecondaryStyleSection" style="display: none;">
+                                        <label class="dropdown-label">Secondary Shows</label>
+                                        <div class="dropdown-options" id="translatingSecondaryStyle"></div>
+                                    </div>
+                                </div>
+                                <div id="translatingNoSettings">
+                                    <p class="no-settings-msg">No display settings available for this language yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-content" id="translatingText">
+                    <p class="empty-state">Your text will appear here...</p>
+                </div>
+            </div>
+
+            <!-- SWAP BUTTON -->
+            <div class="panel-swap-wrapper">
+                <button class="panel-swap-btn" id="panelSwapBtn" title="Swap translation direction">⇄</button>
+            </div>
+
+            <!-- RIGHT PANEL: Translated -->
+            <div class="results-panel translated-panel">
+                <div class="panel-header">
+                    <div class="panel-titles">
+                        <h3 class="panel-fixed-title">Translated</h3>
+                        <p class="panel-lang-name" id="translatedLangName">French</p>
+                    </div>
+                    <div class="panel-header-actions">
+                        <button class="copy-btn" id="copyTranslatedBtn" title="Copy text">Copy</button>
+                        <div class="panel-settings-wrapper">
+                            <button class="panel-settings-btn" id="translatedSettingsBtn" title="Display settings">🇫🇷</button>
+                            <div class="panel-settings-dropdown" id="translatedSettingsDropdown">
+                                <div class="dropdown-title" id="translatedDropdownTitle">French Display Settings</div>
+                                <div id="translatedJpSettings" style="display: none;">
+                                    <div class="dropdown-section">
+                                        <label class="dropdown-label">Main Display Style</label>
+                                        <div class="dropdown-options" id="translatedMainStyle">
+                                            <button class="style-option active" data-value="kanji">Kanji + Hiragana</button>
+                                            <button class="style-option" data-value="hiragana">Hiragana only</button>
+                                            <button class="style-option" data-value="romaji">Romaji only</button>
+                                        </div>
+                                    </div>
+                                    <div class="dropdown-section">
+                                        <label class="dropdown-label">Secondary Display</label>
+                                        <div class="dropdown-options" id="translatedSecondaryMode">
+                                            <button class="style-option active" data-value="off">Off</button>
+                                            <button class="style-option" data-value="always">Always on</button>
+                                            <button class="style-option" data-value="click">On click only</button>
+                                        </div>
+                                    </div>
+                                    <div class="dropdown-section" id="translatedSecondaryStyleSection" style="display: none;">
+                                        <label class="dropdown-label">Secondary Shows</label>
+                                        <div class="dropdown-options" id="translatedSecondaryStyle"></div>
+                                    </div>
+                                </div>
+                                <div id="translatedNoSettings">
+                                    <p class="no-settings-msg">No display settings available for this language yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-content" id="translatedText">
+                    <p class="empty-state">Translation will appear here...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- EMAIL POPUP -->
+    <div class="email-overlay" id="emailOverlay" style="display: none;">
+        <div class="email-popup">
+            <div class="email-icon">🦆</div>
+            <h2 class="email-title">Welcome to Talking Duck!</h2>
+            <p class="email-subtitle">Get notified when we add new languages, features, and learning tools.</p>
+            <form class="email-form" id="emailForm">
+                <input type="email" class="email-input" id="emailInput" placeholder="your@email.com" required>
+                <button type="submit" class="email-submit-btn">Keep Me Updated 🦆</button>
+            </form>
+            <button class="email-skip" id="emailSkip">No thanks, just let me translate</button>
+        </div>
+    </div>
+
+    <!-- ROADMAP MODAL -->
+    <div class="roadmap-overlay" id="roadmapOverlay" style="display: none;">
+        <div class="roadmap-window">
+            <div class="roadmap-header">
+                <h3>📋 Project Roadmap</h3>
+                <button class="roadmap-close" id="roadmapClose">✕</button>
+            </div>
+            <div class="roadmap-content">
+                <div class="roadmap-phase completed">
+                    <div class="phase-badge completed-badge">✅ Complete</div>
+                    <h4 class="phase-title">Phase 1 — Core App</h4>
+                    <p class="phase-description">The foundation of Talking Duck</p>
+                    <ul class="phase-list">
+                        <li class="done">Side-by-side translation display</li>
+                        <li class="done">English, French & Japanese support</li>
+                        <li class="done">Word highlighting (hover to see matches)</li>
+                        <li class="done">Dark & light mode</li>
+                        <li class="done">Translation history (last 20)</li>
+                        <li class="done">Japanese display settings (Kanji, Hiragana, Romaji)</li>
+                        <li class="done">Keyboard shortcuts</li>
+                        <li class="done">Copy buttons for both panels</li>
+                        <li class="done">Character counter</li>
+                        <li class="done">Installable as phone/desktop app (PWA)</li>
+                        <li class="done">Email notifications signup</li>
+                        <li class="done">Deployed & live</li>
+                    </ul>
+                </div>
+                <div class="roadmap-phase upcoming">
+                    <div class="phase-badge upcoming-badge">🔜 Up Next</div>
+                    <h4 class="phase-title">Phase 2 — Browser Extension</h4>
+                    <p class="phase-description">Translate anywhere on the web</p>
+                    <ul class="phase-list">
+                        <li>Highlight text on any webpage to translate</li>
+                        <li>Floating side-by-side translation window</li>
+                        <li>Chrome & Brave extension</li>
+                        <li>Song lyrics search & auto-fill</li>
+                    </ul>
+                </div>
+                <div class="roadmap-phase future">
+                    <div class="phase-badge future-badge">🚀 Future</div>
+                    <h4 class="phase-title">Phase 3 — Smart Features</h4>
+                    <p class="phase-description">AI-powered learning tools</p>
+                    <ul class="phase-list">
+                        <li>AI-powered accurate word & phrase mapping</li>
+                        <li>Real Japanese conversion (Kanji ↔ Hiragana ↔ Romaji)</li>
+                        <li>Audio pronunciation for words</li>
+                        <li>More languages</li>
+                        <li>Vocabulary saving & flashcards</li>
+                        <li>Multi-language fluency support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY PANEL -->
+    <div class="history-overlay" id="historyOverlay">
+        <div class="history-panel" id="historyPanel">
+            <div class="history-header">
+                <h3>🕐 Translation History</h3>
+                <button class="history-close" id="historyClose">✕</button>
+            </div>
+            <div class="history-list" id="historyList"></div>
+            <div class="history-footer" id="historyFooter">
+                <button class="history-clear-btn" id="historyClearBtn">Clear All History</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HELP WINDOW -->
+    <div class="help-overlay" id="helpOverlay" style="display: none;">
+        <div class="help-window">
+            <div class="help-header">
+                <h3>⌨️ Keyboard Shortcuts</h3>
+                <button class="help-close" id="helpClose">✕</button>
+            </div>
+            <div class="help-content">
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Enter</kbd></div>
+                    <span>Translate text</span>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><kbd>Alt</kbd> + <kbd>1</kbd></div>
+                    <span>Cycle main display style</span>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><kbd>Alt</kbd> + <kbd>2</kbd></div>
+                    <span>Cycle secondary display style</span>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><kbd>Alt</kbd> + <kbd>3</kbd></div>
+                    <span>Toggle secondary on/off</span>
+                </div>
+                <div class="shortcut-row">
+                    <div class="shortcut-keys"><kbd>Alt</kbd> + <kbd>H</kbd></div>
+                    <span>Show/hide this help window</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
