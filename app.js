@@ -52,6 +52,12 @@ var translatedSecondaryStyle = document.getElementById('translatedSecondaryStyle
 var charCounter = document.getElementById('charCounter');
 var copyTranslatingBtn = document.getElementById('copyTranslatingBtn');
 var copyTranslatedBtn = document.getElementById('copyTranslatedBtn');
+var lyricsToggleBtn = document.getElementById('lyricsToggleBtn');
+var lyricsSearchBox = document.getElementById('lyricsSearchBox');
+var artistInput = document.getElementById('artistInput');
+var songInput = document.getElementById('songInput');
+var lyricsSearchBtn = document.getElementById('lyricsSearchBtn');
+var lyricsStatus = document.getElementById('lyricsStatus');
 
 /* ============================================
    CONSTANTS & STATE
@@ -838,6 +844,182 @@ function getVersionFromSW() {
     }
 }
 
+/* ============================================
+   LYRICS SEARCH
+   ============================================ */
+
+/* Toggle the search box open/closed */
+lyricsToggleBtn.addEventListener('click', function() {
+    var isOpen = lyricsSearchBox.classList.contains('open');
+    if (isOpen) {
+        lyricsSearchBox.classList.remove('open');
+        lyricsToggleBtn.classList.remove('active');
+    } else {
+        lyricsSearchBox.classList.add('open');
+        lyricsToggleBtn.classList.add('active');
+        artistInput.focus();
+    }
+});
+
+/* Allow pressing Enter in either input to trigger search */
+artistInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        searchLyrics();
+    }
+});
+
+songInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        searchLyrics();
+    }
+});
+
+/* Search button click */
+lyricsSearchBtn.addEventListener('click', function() {
+    searchLyrics();
+});
+
+/* Show a status message below the search box */
+function showLyricsStatus(message, type) {
+    lyricsStatus.textContent = message;
+    lyricsStatus.className = 'lyrics-status ' + type;
+    lyricsStatus.style.display = 'block';
+}
+
+/* Hide the status message */
+function hideLyricsStatus() {
+    lyricsStatus.style.display = 'none';
+}
+
+/* Clean up lyrics text from the API */
+function cleanLyrics(text) {
+    /* Remove any lines that are just whitespace */
+    var lines = text.split('\n');
+    var cleaned = [];
+    var blankCount = 0;
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line === '') {
+            blankCount++;
+            /* Allow max one blank line in a row */
+            if (blankCount <= 1) {
+                cleaned.push('');
+            }
+        } else {
+            blankCount = 0;
+            cleaned.push(line);
+        }
+    }
+    /* Remove leading and trailing blank lines */
+    while (cleaned.length > 0 && cleaned[0] === '') {
+        cleaned.shift();
+    }
+    while (cleaned.length > 0 && cleaned[cleaned.length - 1] === '') {
+        cleaned.pop();
+    }
+    return cleaned.join('\n');
+}
+
+/* Truncate lyrics to fit within character limit */
+function truncateLyrics(text, limit) {
+    if (text.length <= limit) return text;
+    /* Try to cut at a newline so we don't cut mid-word */
+    var cut = text.lastIndexOf('\n', limit);
+    if (cut < limit * 0.7) {
+        /* No good newline found, cut at last space */
+        cut = text.lastIndexOf(' ', limit);
+    }
+    if (cut < 1) cut = limit;
+    return text.substring(0, cut);
+}
+
+/* The main search function */
+function searchLyrics() {
+    var artist = artistInput.value.trim();
+    var song = songInput.value.trim();
+
+    /* Validate inputs */
+    if (!artist) {
+        artistInput.focus();
+        artistInput.style.borderColor = '#ff3b30';
+        setTimeout(function() { artistInput.style.borderColor = ''; }, 2000);
+        showLyricsStatus('Please enter an artist name.', 'error');
+        return;
+    }
+    if (!song) {
+        songInput.focus();
+        songInput.style.borderColor = '#ff3b30';
+        setTimeout(function() { songInput.style.borderColor = ''; }, 2000);
+        showLyricsStatus('Please enter a song title.', 'error');
+        return;
+    }
+
+    /* Show loading state */
+    lyricsSearchBtn.disabled = true;
+    lyricsSearchBtn.textContent = 'Searching...';
+    showLyricsStatus('🔍 Searching for "' + song + '" by ' + artist + '...', 'loading');
+
+    /* Build the API URL */
+    var url = 'https://api.lyrics.ovh/v1/' + encodeURIComponent(artist) + '/' + encodeURIComponent(song);
+
+    fetch(url)
+        .then(function(response) {
+            if (!response.ok) {
+                throw new Error('not found');
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            if (!data.lyrics || data.lyrics.trim() === '') {
+                throw new Error('empty');
+            }
+
+            /* Clean up the lyrics */
+            var lyrics = cleanLyrics(data.lyrics);
+
+            /* Check if we need to truncate */
+            var wasTruncated = lyrics.length > CHAR_LIMIT;
+            if (wasTruncated) {
+                lyrics = truncateLyrics(lyrics, CHAR_LIMIT);
+            }
+
+            /* Fill the textarea */
+            inputText.value = lyrics;
+
+            /* Trigger the auto-resize */
+            inputText.style.height = 'auto';
+            inputText.style.height = Math.min(inputText.scrollHeight, 300) + 'px';
+
+            /* Update character counter */
+            updateCharCounter();
+
+            /* Clear any existing translation */
+            clearTranslation();
+
+            /* Show success message */
+            if (wasTruncated) {
+                showLyricsStatus('✅ Found! Lyrics loaded (truncated to ' + CHAR_LIMIT + ' characters). Hit Translate!', 'success');
+            } else {
+                showLyricsStatus('✅ Lyrics loaded for "' + song + '" by ' + artist + '". Hit Translate!', 'success');
+            }
+
+            /* Scroll down to the textarea */
+            inputText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        })
+        .catch(function(err) {
+            if (err.message === 'empty') {
+                showLyricsStatus('⚠️ Song found but lyrics were empty. Try a different spelling.', 'error');
+            } else {
+                showLyricsStatus('❌ Lyrics not found. Check the spelling or try a different song.', 'error');
+            }
+        })
+        .finally(function() {
+            lyricsSearchBtn.disabled = false;
+            lyricsSearchBtn.textContent = 'Search 🎵';
+        });
+}
 /* ============================================
    INIT
    ============================================ */

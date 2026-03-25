@@ -16,6 +16,8 @@
 </head>
 <body>
     <div class="container">
+
+        <!-- HEADER -->
         <header class="header">
             <h1>🦆 Talking Duck</h1>
             <span class="version-number">v...</span>
@@ -38,6 +40,7 @@
             </div>
         </header>
 
+        <!-- LANGUAGE SELECTOR -->
         <div class="language-selector">
             <div class="lang-option">
                 <label>I speak:</label>
@@ -52,6 +55,48 @@
             </div>
         </div>
 
+        <!-- LYRICS SEARCH SECTION -->
+        <div class="lyrics-section" id="lyricsSection">
+
+            <!-- Toggle button to show/hide the search box -->
+            <button class="lyrics-toggle-btn" id="lyricsToggleBtn">
+                🎵 Find Song Lyrics
+            </button>
+
+            <!-- The search box — hidden by default -->
+            <div class="lyrics-search-box" id="lyricsSearchBox">
+
+                <div class="lyrics-search-row">
+                    <div class="lyrics-input-group">
+                        <label class="lyrics-label" for="artistInput">Artist</label>
+                        <input
+                            type="text"
+                            class="lyrics-input"
+                            id="artistInput"
+                            placeholder="e.g. The Beatles"
+                        >
+                    </div>
+                    <div class="lyrics-input-group">
+                        <label class="lyrics-label" for="songInput">Song Title</label>
+                        <input
+                            type="text"
+                            class="lyrics-input"
+                            id="songInput"
+                            placeholder="e.g. Hey Jude"
+                        >
+                    </div>
+                    <button class="lyrics-search-btn" id="lyricsSearchBtn">
+                        Search 🎵
+                    </button>
+                </div>
+
+                <!-- Status message — shows loading, found, or error -->
+                <div class="lyrics-status" id="lyricsStatus" style="display: none;"></div>
+
+            </div>
+        </div>
+
+        <!-- INPUT AREA -->
         <div class="input-area">
             <textarea
                 id="inputText"
@@ -63,6 +108,7 @@
             <button class="translate-btn" id="translateBtn">Translate 🦆</button>
         </div>
 
+        <!-- RESULTS PANELS -->
         <div class="results-container" id="resultsContainer">
 
             <!-- LEFT PANEL: Translating -->
@@ -165,7 +211,10 @@
             </div>
 
         </div>
+        <!-- end .results-container -->
+
     </div>
+    <!-- end .container -->
 
     <!-- EMAIL POPUP -->
     <div class="email-overlay" id="emailOverlay" style="display: none;">
@@ -203,6 +252,7 @@
                         <li class="done">Keyboard shortcuts</li>
                         <li class="done">Copy buttons for both panels</li>
                         <li class="done">Character counter</li>
+                        <li class="done">Song lyrics search</li>
                         <li class="done">Installable as phone/desktop app (PWA)</li>
                         <li class="done">Email notifications signup</li>
                         <li class="done">Deployed & live</li>
@@ -216,7 +266,6 @@
                         <li>Highlight text on any webpage to translate</li>
                         <li>Floating side-by-side translation window</li>
                         <li>Chrome & Brave extension</li>
-                        <li>Song lyrics search & auto-fill</li>
                     </ul>
                 </div>
                 <div class="roadmap-phase future">
@@ -227,6 +276,7 @@
                         <li>AI-powered accurate word & phrase mapping</li>
                         <li>Real Japanese conversion (Kanji ↔ Hiragana ↔ Romaji)</li>
                         <li>Audio pronunciation for words</li>
+                        <li>YouTube video translation</li>
                         <li>More languages</li>
                         <li>Vocabulary saving & flashcards</li>
                         <li>Multi-language fluency support</li>
