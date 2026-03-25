@@ -69,7 +69,6 @@ var langNames = { 'en': 'English', 'fr': 'French', 'ja': 'Japanese' };
 var langFlags = { 'en': '🇬🇧', 'fr': '🇫🇷', 'ja': '🇯🇵' };
 var allLanguages = ['en', 'fr', 'ja'];
 
-/* Map detected language codes to our supported ones */
 var langCodeMap = {
     'en': 'en',
     'fr': 'fr',
@@ -417,18 +416,33 @@ copyTranslatedBtn.addEventListener('click', function() {
    ============================================ */
 
 function translateText(text, src, tgt) {
-    var url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=' + src + '|' + tgt;
+    /* Safety check — never translate if same language */
+    if (src === tgt) {
+        console.warn('🦆 Skipping translation — src and tgt are both: ' + src);
+        return Promise.resolve(null);
+    }
+
+    var url = 'https://api.mymemory.translated.net/get?q='
+        + encodeURIComponent(text)
+        + '&langpair=' + src + '|' + tgt;
+
+    console.log('🦆 Translating: ' + src + ' → ' + tgt);
+
     return fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(d) {
+            console.log('🦆 API response status:', d.responseStatus);
+            console.log('🦆 API response details:', d.responseDetails);
             if (d.responseStatus === 200) {
                 return d.responseData.translatedText;
             } else {
-                throw new Error('fail');
+                /* Log the full response so we can see what went wrong */
+                console.error('🦆 API error details:', d);
+                throw new Error('API returned status: ' + d.responseStatus + ' — ' + d.responseDetails);
             }
         })
         .catch(function(err) {
-            console.error('Translation error:', err);
+            console.error('🦆 Translation error:', err.message);
             return null;
         });
 }
@@ -438,58 +452,39 @@ function translateText(text, src, tgt) {
    ============================================ */
 
 function detectLanguage(text) {
-    /*
-       Uses the unofficial Google Translate endpoint.
-       We send a short sample of text with sl=auto
-       and it returns the detected language code.
-       No API key needed.
-    */
     var sample = text.substring(0, 200);
-    var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(sample);
+    var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q='
+        + encodeURIComponent(sample);
 
     return fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            /*
-               Response format:
-               d[2] = detected language code e.g. "fr", "ja", "en"
-            */
             if (d && d[2]) {
+                console.log('🦆 Detected language:', d[2]);
                 return d[2];
             }
             return null;
         })
-        .catch(function() {
+        .catch(function(err) {
+            console.warn('🦆 Language detection failed:', err.message);
             return null;
         });
 }
 
-/*
-   After detecting lyrics language, figure out the best
-   FROM → TO direction and update the app state.
-
-   Logic:
-   - If detected lang is supported AND different from fluent lang
-     → set translating=detected, translated=fluent
-   - If detected lang IS the fluent lang
-     → keep current learning lang as target
-   - If detected lang is not supported or detection failed
-     → don't change anything, let user translate as-is
-*/
 function setLanguagesFromDetected(detectedCode) {
-    /* Map to our supported language codes */
     var mapped = langCodeMap[detectedCode];
 
     if (!mapped) {
-        /* Language not supported — don't change settings */
+        console.log('🦆 Detected language not supported:', detectedCode);
         return false;
     }
 
+    console.log('🦆 Mapped detected language to:', mapped);
+
     if (mapped === state.fluentLang) {
         /*
-           Lyrics are in the user's fluent language
-           (e.g. user speaks English, song is in English)
-           → translate TO the learning language (normal direction)
+           Song is in the user's fluent language
+           Normal direction — no swap needed
         */
         state.panelsSwapped = false;
         rebuildLanguageSelector();
@@ -497,33 +492,25 @@ function setLanguagesFromDetected(detectedCode) {
         return true;
     }
 
-    if (mapped === state.learningLang) {
+    if (allLanguages.includes(mapped)) {
         /*
-           Lyrics are in the language they're learning
-           (e.g. user speaks English, learning French, song is French)
-           → swap panels so French is on left, English on right
+           Song is in a supported language that isn't the
+           fluent language — put it on the LEFT (translating side)
+           and fluent language on the RIGHT (translated side)
         */
+        if (mapped !== state.learningLang) {
+            state.learningLang = mapped;
+        }
         state.panelsSwapped = true;
+        fluentOptions.querySelectorAll('.style-option').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.value === state.fluentLang);
+        });
+        rebuildLanguageSelector();
         updatePanelDisplay();
         return true;
     }
 
-    /*
-       Lyrics are in a supported language that isn't fluent
-       or learning — set it as the new learning language
-       and put it on the left (translating side)
-    */
-    state.learningLang = mapped;
-    state.panelsSwapped = true;
-
-    /* Update the fluent options UI */
-    fluentOptions.querySelectorAll('.style-option').forEach(function(b) {
-        b.classList.toggle('active', b.dataset.value === state.fluentLang);
-    });
-
-    rebuildLanguageSelector();
-    updatePanelDisplay();
-    return true;
+    return false;
 }
 
 /* ============================================
@@ -665,7 +652,7 @@ function setupClickReveal() {
    TRANSLATE BUTTON
    ============================================ */
 
-translateBtn.addEventListener('click', function() {
+function runTranslation() {
     var text = inputText.value.trim();
     if (!text) {
         inputText.style.borderColor = '#ff3b30';
@@ -677,12 +664,17 @@ translateBtn.addEventListener('click', function() {
         setTimeout(function() { inputText.style.borderColor = ''; }, 2000);
         return;
     }
+
     var from = getTranslatingLang();
     var to = getTranslatedLang();
+
+    console.log('🦆 Running translation: from=' + from + ' to=' + to);
+
     if (from === to) {
-        alert('Please select two different languages!');
+        showLyricsStatus('⚠️ Both panels show the same language. Please check your language settings.', 'error');
         return;
     }
+
     translateBtn.textContent = 'Translating... 🦆';
     translateBtn.disabled = true;
 
@@ -695,11 +687,15 @@ translateBtn.addEventListener('click', function() {
             renderTranslation(text, translated, from, to);
             saveToHistory(text, translated, from, to);
         } else {
-            alert('Translation failed. Please try again!');
+            showLyricsStatus('❌ Translation failed. The API may be rate-limited. Try again in a moment.', 'error');
         }
         translateBtn.textContent = 'Translate 🦆';
         translateBtn.disabled = false;
     });
+}
+
+translateBtn.addEventListener('click', function() {
+    runTranslation();
 });
 
 /* ============================================
@@ -754,7 +750,17 @@ function renderHistoryList() {
     h.forEach(function(item) {
         var div = document.createElement('div');
         div.className = 'history-item';
-        div.innerHTML = '<div class="history-item-langs"><span class="history-lang-badge">' + (langNames[item.fromLang] || item.fromLang) + '</span><span class="history-arrow">→</span><span class="history-lang-badge">' + (langNames[item.toLang] || item.toLang) + '</span></div><div class="history-item-text">' + escapeHtml(item.original) + '</div><div class="history-item-translation">' + escapeHtml(item.translated) + '</div><div class="history-item-date">' + formatDate(item.date) + '</div>';
+        div.innerHTML = '<div class="history-item-langs"><span class="history-lang-badge">'
+            + (langNames[item.fromLang] || item.fromLang)
+            + '</span><span class="history-arrow">→</span><span class="history-lang-badge">'
+            + (langNames[item.toLang] || item.toLang)
+            + '</span></div><div class="history-item-text">'
+            + escapeHtml(item.original)
+            + '</div><div class="history-item-translation">'
+            + escapeHtml(item.translated)
+            + '</div><div class="history-item-date">'
+            + formatDate(item.date)
+            + '</div>';
         div.addEventListener('click', function() { loadHistoryItem(item); });
         historyList.appendChild(div);
     });
@@ -864,7 +870,7 @@ helpOverlay.addEventListener('click', function(e) { if (e.target === helpOverlay
 document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
-        translateBtn.click();
+        runTranslation();
         return;
     }
     if (document.activeElement === inputText) return;
@@ -953,7 +959,6 @@ function getVersionFromSW() {
    LYRICS SEARCH
    ============================================ */
 
-/* Toggle the search box open/closed */
 lyricsToggleBtn.addEventListener('click', function() {
     var isOpen = lyricsSearchBox.classList.contains('open');
     if (isOpen) {
@@ -966,39 +971,28 @@ lyricsToggleBtn.addEventListener('click', function() {
     }
 });
 
-/* Allow pressing Enter in either input to trigger search */
 artistInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        searchLyrics();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); searchLyrics(); }
 });
 
 songInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        e.preventDefault();
-        searchLyrics();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); searchLyrics(); }
 });
 
-/* Search button click */
 lyricsSearchBtn.addEventListener('click', function() {
     searchLyrics();
 });
 
-/* Show a status message below the search box */
 function showLyricsStatus(message, type) {
     lyricsStatus.textContent = message;
     lyricsStatus.className = 'lyrics-status ' + type;
     lyricsStatus.style.display = 'block';
 }
 
-/* Hide the status message */
 function hideLyricsStatus() {
     lyricsStatus.style.display = 'none';
 }
 
-/* Clean up lyrics text from the API */
 function cleanLyrics(text) {
     var lines = text.split('\n');
     var cleaned = [];
@@ -1007,35 +1001,25 @@ function cleanLyrics(text) {
         var line = lines[i].trim();
         if (line === '') {
             blankCount++;
-            if (blankCount <= 1) {
-                cleaned.push('');
-            }
+            if (blankCount <= 1) { cleaned.push(''); }
         } else {
             blankCount = 0;
             cleaned.push(line);
         }
     }
-    while (cleaned.length > 0 && cleaned[0] === '') {
-        cleaned.shift();
-    }
-    while (cleaned.length > 0 && cleaned[cleaned.length - 1] === '') {
-        cleaned.pop();
-    }
+    while (cleaned.length > 0 && cleaned[0] === '') { cleaned.shift(); }
+    while (cleaned.length > 0 && cleaned[cleaned.length - 1] === '') { cleaned.pop(); }
     return cleaned.join('\n');
 }
 
-/* Truncate lyrics to fit within character limit */
 function truncateLyrics(text, limit) {
     if (text.length <= limit) return text;
     var cut = text.lastIndexOf('\n', limit);
-    if (cut < limit * 0.7) {
-        cut = text.lastIndexOf(' ', limit);
-    }
+    if (cut < limit * 0.7) { cut = text.lastIndexOf(' ', limit); }
     if (cut < 1) cut = limit;
     return text.substring(0, cut);
 }
 
-/* The main search function */
 function searchLyrics() {
     var artist = artistInput.value.trim();
     var song = songInput.value.trim();
@@ -1055,12 +1039,13 @@ function searchLyrics() {
         return;
     }
 
-    /* Show loading state */
     lyricsSearchBtn.disabled = true;
     lyricsSearchBtn.textContent = 'Searching...';
     showLyricsStatus('🔍 Searching for "' + song + '" by ' + artist + '...', 'loading');
 
-    var url = 'https://api.lyrics.ovh/v1/' + encodeURIComponent(artist) + '/' + encodeURIComponent(song);
+    var url = 'https://api.lyrics.ovh/v1/'
+        + encodeURIComponent(artist) + '/'
+        + encodeURIComponent(song);
 
     fetch(url)
         .then(function(response) {
@@ -1078,42 +1063,50 @@ function searchLyrics() {
                 lyrics = truncateLyrics(lyrics, CHAR_LIMIT);
             }
 
-            /* Fill the textarea */
+            /* Fill textarea */
             inputText.value = lyrics;
             inputText.style.height = 'auto';
             inputText.style.height = Math.min(inputText.scrollHeight, 300) + 'px';
             updateCharCounter();
             clearTranslation();
 
-            /* Show detecting status */
             showLyricsStatus('🔍 Detecting song language...', 'loading');
 
-            /* Detect the language of the lyrics */
+            /* Detect language then translate */
             detectLanguage(lyrics).then(function(detectedCode) {
+                var detectedName = null;
+                var languageWasSet = false;
 
-                var detectedName = detectedCode ? (langNames[langCodeMap[detectedCode]] || null) : null;
-                var languageWasSet = detectedCode ? setLanguagesFromDetected(detectedCode) : false;
+                if (detectedCode) {
+                    var mappedCode = langCodeMap[detectedCode];
+                    if (mappedCode) {
+                        detectedName = langNames[mappedCode];
+                    }
+                    languageWasSet = setLanguagesFromDetected(detectedCode);
+                }
 
-                /* Build success message */
+                /* Build status message */
                 var msg = '';
                 if (wasTruncated) {
-                    msg += 'Lyrics loaded (truncated to ' + CHAR_LIMIT + ' chars). ';
+                    msg += '✅ Lyrics loaded (truncated to ' + CHAR_LIMIT + ' chars). ';
                 } else {
-                    msg += '✅ "' + song + '" by ' + artist + '" loaded! ';
+                    msg += '✅ "' + song + '" by ' + artist + ' loaded! ';
                 }
-
                 if (detectedName && languageWasSet) {
-                    msg += 'Detected: ' + detectedName + '. ';
+                    msg += 'Detected language: ' + detectedName + '. ';
                 }
-
-                msg += 'Hit Translate 🦆';
+                msg += 'Translating now...';
                 showLyricsStatus(msg, 'success');
 
-                /* Scroll to textarea */
                 inputText.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                /* Auto-translate! */
-                translateBtn.click();
+                /*
+                   Small delay to make sure state has fully
+                   updated before running the translation
+                */
+                setTimeout(function() {
+                    runTranslation();
+                }, 300);
             });
         })
         .catch(function(err) {
