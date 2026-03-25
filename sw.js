@@ -2,7 +2,7 @@
    TALKING DUCK 🦆 - SERVICE WORKER
    ============================================ */
 
-const CACHE_VERSION = '1.0.4';
+const CACHE_VERSION = '1.0.6';
 const CACHE_NAME = 'talking-duck-v' + CACHE_VERSION;
 
 const ASSETS_TO_CACHE = [
