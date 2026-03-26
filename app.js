@@ -415,34 +415,162 @@ copyTranslatedBtn.addEventListener('click', function() {
    TRANSLATION API
    ============================================ */
 
-function translateText(text, src, tgt) {
-    /* Safety check — never translate if same language */
-    if (src === tgt) {
-        console.warn('🦆 Skipping translation — src and tgt are both: ' + src);
-        return Promise.resolve(null);
+/* ============================================
+   TRANSLATION API — CHUNKED
+   Splits text into chunks under 500 chars,
+   translates each, stitches results together
+   ============================================ */
+
+var API_CHUNK_LIMIT = 490; /* Stay safely under the 500 char API limit */
+
+/*
+   Split text into chunks that are each under the limit.
+   We try to split at paragraph breaks, then sentence
+   endings, then spaces — never mid-word.
+*/
+function splitIntoChunks(text, limit) {
+    var chunks = [];
+
+    /* If it fits in one chunk, no splitting needed */
+    if (text.length <= limit) {
+        chunks.push(text);
+        return chunks;
     }
 
+    var remaining = text;
+
+    while (remaining.length > 0) {
+
+        /* If what's left fits, add it and stop */
+        if (remaining.length <= limit) {
+            chunks.push(remaining);
+            break;
+        }
+
+        /* Try to cut at a paragraph break (double newline) */
+        var cut = -1;
+        var paraBreak = remaining.lastIndexOf('\n\n', limit);
+        if (paraBreak > limit * 0.4) {
+            cut = paraBreak + 2; /* Include the newlines in the chunk */
+        }
+
+        /* Try to cut at a single newline */
+        if (cut === -1) {
+            var lineBreak = remaining.lastIndexOf('\n', limit);
+            if (lineBreak > limit * 0.4) {
+                cut = lineBreak + 1;
+            }
+        }
+
+        /* Try to cut at a sentence end (. ! ?) */
+        if (cut === -1) {
+            var sentenceEnd = -1;
+            var punctuation = ['. ', '! ', '? ', '.\n', '!\n', '?\n'];
+            for (var p = 0; p < punctuation.length; p++) {
+                var idx = remaining.lastIndexOf(punctuation[p], limit);
+                if (idx > sentenceEnd && idx > limit * 0.4) {
+                    sentenceEnd = idx + 1; /* Cut after the punctuation */
+                }
+            }
+            if (sentenceEnd > -1) {
+                cut = sentenceEnd + 1;
+            }
+        }
+
+        /* Fall back to cutting at a space */
+        if (cut === -1) {
+            var spaceBreak = remaining.lastIndexOf(' ', limit);
+            if (spaceBreak > limit * 0.4) {
+                cut = spaceBreak + 1;
+            }
+        }
+
+        /* Last resort — hard cut at the limit */
+        if (cut === -1 || cut === 0) {
+            cut = limit;
+        }
+
+        chunks.push(remaining.substring(0, cut));
+        remaining = remaining.substring(cut);
+    }
+
+    return chunks;
+}
+
+/*
+   Translate a single chunk via the MyMemory API
+*/
+function translateChunk(text, src, tgt) {
     var url = 'https://api.mymemory.translated.net/get?q='
         + encodeURIComponent(text)
         + '&langpair=' + src + '|' + tgt;
 
-    console.log('🦆 Translating: ' + src + ' → ' + tgt);
-
     return fetch(url)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            console.log('🦆 API response status:', d.responseStatus);
-            console.log('🦆 API response details:', d.responseDetails);
             if (d.responseStatus === 200) {
                 return d.responseData.translatedText;
             } else {
-                /* Log the full response so we can see what went wrong */
-                console.error('🦆 API error details:', d);
-                throw new Error('API returned status: ' + d.responseStatus + ' — ' + d.responseDetails);
+                console.error('🦆 Chunk API error:', d.responseDetails);
+                throw new Error('API error: ' + d.responseDetails);
             }
+        });
+}
+
+/*
+   Translate chunks one at a time (sequential, not parallel)
+   so we don't hammer the API and trigger rate limiting.
+   Returns a Promise that resolves to the full translated text.
+*/
+function translateChunksSequentially(chunks, src, tgt, index, results) {
+    if (index >= chunks.length) {
+        /* All done — join results */
+        return Promise.resolve(results.join(' '));
+    }
+
+    console.log('🦆 Translating chunk ' + (index + 1) + ' of ' + chunks.length
+        + ' (' + chunks[index].length + ' chars)');
+
+    /* Update the button to show progress */
+    translateBtn.textContent = 'Translating ' + (index + 1) + '/' + chunks.length + '... 🦆';
+
+    return translateChunk(chunks[index], src, tgt)
+        .then(function(translated) {
+            results.push(translated);
+            /* Small delay between chunks to be kind to the free API */
+            return new Promise(function(resolve) {
+                setTimeout(resolve, 300);
+            });
+        })
+        .then(function() {
+            return translateChunksSequentially(chunks, src, tgt, index + 1, results);
         })
         .catch(function(err) {
-            console.error('🦆 Translation error:', err.message);
+            console.error('🦆 Chunk ' + (index + 1) + ' failed:', err.message);
+            /* Push empty string so other chunks still work */
+            results.push('[translation error]');
+            return translateChunksSequentially(chunks, src, tgt, index + 1, results);
+        });
+}
+
+/*
+   Main translate function — handles everything
+*/
+function translateText(text, src, tgt) {
+    /* Safety check */
+    if (src === tgt) {
+        console.warn('🦆 Skipping — same language:', src);
+        return Promise.resolve(null);
+    }
+
+    console.log('🦆 Translating: ' + src + ' → ' + tgt + ' (' + text.length + ' chars total)');
+
+    var chunks = splitIntoChunks(text, API_CHUNK_LIMIT);
+    console.log('🦆 Split into ' + chunks.length + ' chunk(s)');
+
+    return translateChunksSequentially(chunks, src, tgt, 0, [])
+        .catch(function(err) {
+            console.error('🦆 Translation failed:', err.message);
             return null;
         });
 }
